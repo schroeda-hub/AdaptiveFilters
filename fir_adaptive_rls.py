@@ -1,13 +1,21 @@
 import numpy as np
 
 class fir_adaptive_rls(object):
-    def __init__(self, N: int):
+    def __init__(self, N: int, p=0.95):
         """Init of a lms adaptive filter.
 
         Args:
             N (int): Order of filter
         """
         self.N = N
+        self.x = np.zeros(self.N)
+        self.b = np.zeros(self.N)
+        self.e = 0.0
+        self.z = np.zeros(self.N)
+        self.y = 0.0
+        self.R_inv = 1e9 * np.identity(self.N)
+        self.p = p
+        pass
         
     def calc_impz(self, b):
         """Calculate the impulse answer
@@ -85,3 +93,67 @@ class fir_adaptive_rls(object):
             pass
         np.seterr(all='warn')
         return b[self.N:], e[self.N:], y[self.N:]
+
+    def _update_x(self, x:float):
+        for i in range(self.x.size-1,0,-1):
+            self.x[i] = self.x[i-1]
+            # print("{} -> {}".format(i-1,i))
+            pass
+        self.x[0] = x
+
+    def update(self, x:float, d: float):
+        self._update_x(x)
+        self.y = self.x.T @ self.b
+        self.e = d - self.y
+        try:
+            numerator = self.R_inv @ self.x
+            denominator = (self.p + self.x.T @ (self.R_inv @ self.x))
+            if denominator >= 1e307:
+                print(self.b)
+                return
+            assert denominator != 0
+            self.z = numerator/denominator            
+            pass
+        except OverflowError as oe:
+            print("Overflow error", oe)
+            pass
+        self.b = self.b + self.e*self.z
+        self.R_inv = 1/self.p * (self.R_inv - self.z * self.x * self.R_inv)
+        return self.b, self.e, self.y
+        
+    def predict(self, x:float):
+        self._update_x(x)
+        self.y = self.x.T @ self.b
+        return self.y
+    
+def _test():
+    test_filter = fir_adaptive_rls(10)
+    time = np.linspace(0, 4*np.pi, int(3e3))
+    signal = 5*np.sin(time)
+    # signal += 0.4 * np.cos(time * 3)
+    # signal += time % 4*np.pi
+    mean = 0
+    std = 1
+    noise = np.random.normal(mean, std, size=time.size)
+    signal += noise
+    last_signal_value = signal[-1]
+    signal = signal[:-1]
+    delay_samples = 1
+    predicted_values = np.zeros(signal.size)
+    for i in range(signal.size-delay_samples):
+        b,e,y = test_filter.update(signal[i], signal[i+delay_samples])
+        predicted_values[i] = y
+    print("b: {},\n e: {}, y: {}".format(b,e,y))
+    print(test_filter.predict(last_signal_value))
+    error = np.abs(predicted_values - signal)
+    import matplotlib.pyplot as plt
+    plt.plot(20*np.log10(error))
+    plt.show()
+    plt.plot(predicted_values)
+    plt.show()
+    plt.plot(signal)
+    plt.show()
+    pass
+    
+if __name__ == '__main__':
+    _test()
