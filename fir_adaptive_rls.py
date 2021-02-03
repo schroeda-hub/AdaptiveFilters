@@ -101,7 +101,7 @@ class fir_adaptive_rls(object):
             pass
         self.x[0] = x
 
-    def update(self, x:float, d: float):
+    def update(self, x:float, d:float):
         self._update_x(x)
         self.y = self.x.T @ self.b
         self.e = d - self.y
