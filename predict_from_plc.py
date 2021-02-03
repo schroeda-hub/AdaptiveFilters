@@ -39,7 +39,7 @@ def main():
     signal = np.zeros(buffer_size)
     predicted_values = np.zeros(buffer_size) + time_vector[1]
     prediction_error = np.zeros(buffer_size)
-    f,ax = plt.subplots(2)
+    f,ax = plt.subplots(3)
     l1, l2, l3 = ax[0].plot(
         time,
         signal,
@@ -58,6 +58,9 @@ def main():
     ax[1].set_xlabel('time')
     ax[1].set_ylabel('prediction error [dB]')
     ax[1].axis('tight')
+    l5, = ax[2].plot(fir_rls.b)
+    ax[2].set_xlabel('Filter value')
+    ax[2].axis('tight')
     plt.pause(0.01)
     plt.tight_layout()
     
@@ -82,12 +85,15 @@ def main():
         # print("b: {},\ne: {}\n--------".format(b,e))
         l1.set_ydata(time_vector[1])
         l2.set_ydata(predicted_values)
-        l3.set_xdata(time[delay_samples:delay_samples+fir_rls.N])
+        l3.set_xdata(time[delay_samples-1:delay_samples-1+fir_rls.N])
         l3.set_ydata(fir_rls.x)
         ax[0].set_ylim(min(predicted_values),max(predicted_values))
 
         l4.set_ydata(prediction_error)
         ax[1].set_ylim(min(prediction_error),max(prediction_error))
+        
+        l5.set_ydata(b)
+        ax[2].set_ylim(min(b),max(b))
         plt.pause(0.01)
         sleep(1/Fs)            
 
