@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from time import sleep
 
 from fir_adaptive_rls import fir_adaptive_rls
+from fir_adaptive_lms import fir_adaptive_lms
 
 def shift_list(list_):
     for i in range(list_.size-1,0,-1):
@@ -12,7 +13,7 @@ def shift_list(list_):
         
 
 def main():
-    Fs = 1000 # Hz
+    Fs = 10 # Hz
     buffer_size = 1024
     time_duration = buffer_size * 1/Fs
     # ax[0].set_xlim(0,time_duration)
@@ -32,22 +33,23 @@ def main():
     plc.close()
     
     
-    delay_samples = 100
+    delay_samples = 10
     delay_buffer = np.ones(delay_samples) * time_vector[1][0]
-    fir_rls = fir_adaptive_rls(200)
+    ad_filter = fir_adaptive_rls(20)
+    # ad_filter = fir_adaptive_lms(20)
     time = np.arange(0, time_duration, 1/Fs)
     signal = np.zeros(buffer_size)
     predicted_values = np.zeros(buffer_size) + time_vector[1]
     prediction_error = np.zeros(buffer_size)
-    f,ax = plt.subplots(3)
+    fig,ax = plt.subplots(3)
     l1, l2, l3 = ax[0].plot(
         time,
         signal,
         '--' ,
         time,
         predicted_values,
-        time[delay_samples:delay_samples+fir_rls.N],
-        fir_rls.x)
+        time[delay_samples:delay_samples+ad_filter.N],
+        ad_filter.x)
     ax[0].set_xlim(0,time_duration)
     ax[0].legend((l1, l2, l3),('signal', 'predicted signal', 'training_data'))
     ax[0].set_xlabel('time')
@@ -58,7 +60,7 @@ def main():
     ax[1].set_xlabel('time')
     ax[1].set_ylabel('prediction error [dB]')
     ax[1].axis('tight')
-    l5, = ax[2].plot(fir_rls.b)
+    l5, = ax[2].plot(ad_filter.b)
     ax[2].set_xlabel('Filter value')
     ax[2].axis('tight')
     plt.pause(0.01)
@@ -77,7 +79,7 @@ def main():
         delay_buffer[0] = time_vector[1][0]
         
         # update adaptive filter
-        b,e,y = fir_rls.update(x=delay_buffer[-1], d=time_vector[1][0])
+        b,e,y = ad_filter.update(x=delay_buffer[-1], d=time_vector[1][0])
         shift_list(predicted_values)
         predicted_values[0] = y
         shift_list(prediction_error)
@@ -85,8 +87,8 @@ def main():
         # print("b: {},\ne: {}\n--------".format(b,e))
         l1.set_ydata(time_vector[1])
         l2.set_ydata(predicted_values)
-        l3.set_xdata(time[delay_samples-1:delay_samples-1+fir_rls.N])
-        l3.set_ydata(fir_rls.x)
+        l3.set_xdata(time[delay_samples-1:delay_samples-1+ad_filter.N])
+        l3.set_ydata(ad_filter.x)
         ax[0].set_ylim(min(predicted_values),max(predicted_values))
 
         l4.set_ydata(prediction_error)
