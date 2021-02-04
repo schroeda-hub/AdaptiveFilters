@@ -44,7 +44,7 @@ if __name__ == '__main__':
         print("Filter order: {}".format(firObj.N))
     except:
         firObj = fir([1,-1,1,-1])
-    output = firObj.filter(inputSamples)
+    output = firObj.filter_signal(inputSamples)
     output = output + noise
     axs[1].plot(output)
     axs[1].set_title("Output signal")
@@ -64,9 +64,9 @@ if __name__ == '__main__':
     print("RLS remaining error: {}".format(np.mean(np.abs(e_rls[int(-1*num_samples/0.1):-1]))))
     
     fir_lms = fir(b_lms[-1])
-    fir_lms_output = fir_lms.filter(inputSamples)
+    fir_lms_output = fir_lms.filter_signal(inputSamples)
     fir_rls = fir(b_rls[-1])
-    fir_rls_output = fir_rls.filter(inputSamples)
+    fir_rls_output = fir_rls.filter_signal(inputSamples)
     fig, axs = plt.subplots(3,1, constrained_layout = True)
     axs[0].plot(inputSamples)
     axs[0].set_title("Input signal")
