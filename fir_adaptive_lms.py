@@ -1,7 +1,9 @@
 import numpy as np
+from plot_freqz import plot_freqz
+from plot_zplane import zplane
 
 class fir_adaptive_lms(object):
-    def __init__(self, N: int, mu=0.0001):
+    def __init__(self, N: int, mu=0.05):
         """Init of a lms adaptive filter.
 
         Args:
@@ -29,6 +31,14 @@ class fir_adaptive_lms(object):
         for i in range(N):
             impz += "+{}z^(-{})".format(b[i], i)
         return impz
+    
+    def plot_freqz(self):
+        plot_freqz(b=self.b)
+    
+    def plot_zplane(self):
+        a = np.zeros(self.N)
+        a[0] = 1
+        zplane(b=self.b, a=a)
             
     def filter(self, b, signal):
         """Filter a signal using this linear filter

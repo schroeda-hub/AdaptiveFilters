@@ -1,4 +1,6 @@
 import numpy as np
+from plot_freqz import plot_freqz
+from plot_zplane import zplane
 
 class fir(object):
     # G = a/b
@@ -22,6 +24,14 @@ class fir(object):
             # print("{} -> {}".format(i-1,i))
             pass
         self.x[0] = x
+        
+    def plot_freqz(self):
+        plot_freqz(b=self.b)
+    
+    def plot_zplane(self):
+        a = np.zeros(self.N)
+        a[0] = 1
+        zplane(b=self.b, a=a)
     
     def calc_impz(self):
         """Calculate the impulse answer
@@ -69,6 +79,8 @@ def _test():
         test_fir.angle_to_complex(30), test_fir.angle_to_complex(-30)
     ]
     test_fir.set_b(test_fir.calc_from_zPlane(zeros_location))
+    test_fir.plot_freqz()
+    test_fir.plot_zplane()
     pass
     
 if __name__ == '__main__':
