@@ -16,10 +16,11 @@ def get_random(mean, std):
     return np.random.normal(mean, std, size=1)
 
 def main():
-    Fs = 10 # Hz
+    Fs = 10000 # Hz
     buffer_size = 1024
     time_duration = buffer_size * 1/Fs
     
+    testADS = False
     remote_ip = '192.168.20.157'
     remote_ads = '192.168.30.202.1.1'
     plc = pyads.Connection(remote_ads, pyads.PORT_TC3PLC1, remote_ip)
@@ -34,15 +35,16 @@ def main():
     
     test_fir = fir([])
     zeros_location = [
-        1, 
+        -1, 
         0+1j, 0-1j,
-        test_fir.angle_to_complex(10), test_fir.angle_to_complex(-10),
-        test_fir.angle_to_complex(20), test_fir.angle_to_complex(-20),
-        test_fir.angle_to_complex(30), test_fir.angle_to_complex(-30)
+        test_fir.angle_to_complex(170), test_fir.angle_to_complex(-170),
+        test_fir.angle_to_complex(160), test_fir.angle_to_complex(-160),
+        test_fir.angle_to_complex(150), test_fir.angle_to_complex(-150)
     ]
     test_fir.set_b(test_fir.calc_from_zPlane(zeros_location))
     
-    ad_filter = fir_adaptive_rls(20)
+    ad_filter = fir_adaptive_rls(50)
+    ad_filter.p = 0.8
     prediction_error = np.zeros(buffer_size)
     
     fig,ax = plt.subplots(2)
@@ -51,14 +53,19 @@ def main():
         prediction_error)
     ax[0].set_xlim(0,time_duration)
     ax[0].set_xlabel('time')
+    ax[0].set_ylabel('error [dB]')
     ax[0].axis('tight')
     l1, = ax[1].plot(ad_filter.b)
+    if not testADS:
+        l2, = ax[1].plot(test_fir.b, 'x')
+        ax[1].legend((l1, l2),('ad coefficients', 'actual coefficients'))
+    else:
+        ax[0].legend((l1),('coefficients'))
     ax[1].set_xlabel('Filter coefficients')
     ax[1].axis('tight')
     plt.pause(0.01)
     plt.tight_layout()
     
-    testADS = False
     while True:
         input_ = get_random(0, 1) # input noise
         if testADS:
@@ -69,7 +76,7 @@ def main():
             pass
         else:
             output = test_fir.filter(input_) # added noise of measurement
-            output += get_random(0, 0.01)
+            output += get_random(0, 1) * 0.01
             pass
         b,e,y = ad_filter.update(x=input_, d=output)
         shift_list(prediction_error)
