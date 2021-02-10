@@ -18,7 +18,7 @@ class fir_adaptive_rls(object):
         self.R_inv = 1e9 * np.identity(self.N)
         self.p = p
         pass
-        
+
     def calc_impz(self, b):
         """Calculate the impulse answer
 
@@ -33,15 +33,15 @@ class fir_adaptive_rls(object):
         for i in range(N):
             impz += "+{}z^(-{})".format(b[i], i)
         return impz
-    
+
     def plot_freqz(self):
         plot_freqz(b=self.b)
-    
+
     def plot_zplane(self):
         a = np.zeros(self.N)
         a[0] = 1
         zplane(b=self.b, a=a)
-            
+
     def filter(self, b, signal):
         """Filter a signal using this linear filter
 
@@ -61,7 +61,7 @@ class fir_adaptive_rls(object):
                 pass
             output[i] = fir_sum
         return output
-    
+
     def train(self, ref_input, desired_input, p):
         """Train adaptive fir filter RLS
 
@@ -76,7 +76,7 @@ class fir_adaptive_rls(object):
         """
         # Init
         np.seterr(all='raise')
-        assert len(ref_input) == len(desired_input), "Input signals not equal in length" 
+        assert len(ref_input) == len(desired_input), "Input signals not equal in length"
         assert p != 0
         iterations = len(ref_input)
         R_inv = np.zeros([iterations, self.N, self.N])
@@ -122,7 +122,7 @@ class fir_adaptive_rls(object):
                 print(self.b)
                 return
             assert denominator != 0
-            self.z = numerator/denominator            
+            self.z = numerator/denominator
             pass
         except OverflowError as oe:
             print("Overflow error", oe)
@@ -130,13 +130,16 @@ class fir_adaptive_rls(object):
         self.b = self.b + self.e*self.z
         self.R_inv = 1/self.p * (self.R_inv - self.z * self.x * self.R_inv)
         return self.b, self.e, self.y
-        
-    def predict(self, x:float):
-        self._update_x(x)
-        self.y = self.x.T @ self.b
-        return self.y
-    
-def _test():
+
+    def predict(self, samples:int, delay:int):
+        ret_val = np.zeros(samples+self.N)
+        ret_val[:self.N] = self.x
+        for i in range(self.N,samples+self.N):
+            local_x = ret_val[i-self.N:i]
+            ret_val[i] = local_x.T @ self.b
+        return ret_val
+
+def _test_update():
     test_filter = fir_adaptive_rls(10)
     time = np.linspace(0, 4*np.pi, int(3e3))
     signal = 5*np.sin(time)
@@ -164,6 +167,37 @@ def _test():
     plt.plot(signal)
     plt.show()
     pass
-    
+
+def _test_predict():
+    test_filter = fir_adaptive_rls(100)
+    time = np.linspace(0, 4*np.pi, int(3e3))
+    signal = 5*np.sin(time)
+    mean = 0
+    std = 1
+    noise = np.random.normal(mean, std, size=time.size) * 0.0001
+    signal += noise
+    delay_samples = 800
+    predicted_values = np.zeros(signal.size)
+    for i in range(signal.size-delay_samples):
+        b,e,y = test_filter.update(signal[i], signal[i+delay_samples])
+        predicted_values[i] = y
+    error = np.abs(predicted_values - signal)
+    prediction = test_filter.predict(samples=10, delay=delay_samples)
+    predicted_values = np.concatenate((predicted_values, prediction[test_filter.N:]))
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(2,1, constrained_layout = True)
+    ax[0].plot(20*np.log10(error))
+    ax[0].set_title("Error")
+    ax[0].set_ylabel("[dB]")
+    l1, l2 = ax[1].plot(predicted_values, "-x", signal, "-o")
+    ax[1].legend((l1, l2),('Prediction', 'Signal'))
+    ax[1].set_xlabel("samples")
+    range_signal = max(signal) - min(signal)
+    ax[1].set_ylim(min(signal)-range_signal*0.1,max(signal)+range_signal*0.1)
+    plt.show()
+    pass
+
+
 if __name__ == '__main__':
-    _test()
+    # _test_update()
+    _test_predict()
