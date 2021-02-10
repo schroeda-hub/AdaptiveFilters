@@ -10,36 +10,54 @@ def shift_list(list_):
     for i in range(list_.size-1,0,-1):
         list_[i] = list_[i-1]
     return list_
-        
+
+class signal_creator_obj(object):
+    def __init__(self, Fs:float):
+        self.sample_number = -1
+        self.Fs = Fs
+        self.f = 0.1 # Hz
+        self.noise_enable = True
+
+    def _noise(self):
+        mean = 0
+        std = 1
+        return np.random.normal(mean, std, size=1) * 0.01
+
+    def get(self):
+        self.sample_number += 1
+        return np.sin(self.sample_number/self.Fs * 2 * np.pi * self.f) + self._noise()
 
 def main():
     Fs = 10 # Hz
     buffer_size = 1024
     time_duration = buffer_size * 1/Fs
+
+    ads_enable = False
+
     # ax[0].set_xlim(0,time_duration)
     # ax[0].set_ylim(-10,10)
     # ax[0].set_title("Signal")
-    
-    remote_ip = '192.168.20.157'
-    remote_ads = '192.168.30.202.1.1'
-    plc = pyads.Connection(remote_ads, pyads.PORT_TC3PLC1, remote_ip)
-    namespace = "KrogstrupMBE2.temperatureController[4].temperaturePV"
-    time_vector = [np.zeros(buffer_size), np.ones(buffer_size)]
-    time_vector[0] = np.arange(0, time_duration, 1/Fs)
-    plc.open()
-    time_vector[1] *= plc.read_by_name(
-        namespace,
-        pyads.PLCTYPE_LREAL)
-    plc.close()
-    
-    
-    delay_samples = 10
-    delay_buffer = np.ones(delay_samples) * time_vector[1][0]
-    ad_filter = fir_adaptive_rls(20)
-    # ad_filter = fir_adaptive_lms(20)
+
     time = np.arange(0, time_duration, 1/Fs)
-    signal = np.zeros(buffer_size)
-    predicted_values = np.zeros(buffer_size) + time_vector[1]
+    signal = np.ones(buffer_size)
+
+    if ads_enable:
+        remote_ip = '192.168.20.157'
+        remote_ads = '192.168.30.202.1.1'
+        plc = pyads.Connection(remote_ads, pyads.PORT_TC3PLC1, remote_ip)
+        namespace = "KrogstrupMBE2.temperatureController[4].temperaturePV"
+        plc.open()
+        signal *= plc.read_by_name(
+            namespace,
+            pyads.PLCTYPE_LREAL)
+        plc.close()
+
+
+    delay_samples = 10
+    delay_buffer = np.ones(delay_samples) * signal[0]
+    ad_filter = fir_adaptive_rls(20) # RLS
+    # ad_filter = fir_adaptive_lms(20) # LMS
+    predicted_values = np.zeros(buffer_size) + signal
     prediction_error = np.zeros(buffer_size)
     fig,ax = plt.subplots(3)
     l1, l2, l3 = ax[0].plot(
@@ -65,39 +83,56 @@ def main():
     ax[2].axis('tight')
     plt.pause(0.01)
     plt.tight_layout()
-    
+
+
+    if not ads_enable:
+        signal_creator = signal_creator_obj(Fs)
+        signal *= 0
+        delay_buffer *= 0
+        predicted_values *= 0
+        for i in range(delay_samples):
+            shift_list(signal)
+            signal[0] = signal_creator.get()
+        pass
+
     while True:
-        shift_list(time_vector[1])
-        plc.open()
+        shift_list(signal)
         # Read new value
-        time_vector[1][0] = plc.read_by_name(
-            namespace,
-            pyads.PLCTYPE_LREAL)
-        plc.close()
-        
+        if ads_enable:
+            plc.open()
+            signal[0] = plc.read_by_name(
+                namespace,
+                pyads.PLCTYPE_LREAL)
+            plc.close()
+        else:
+            signal[0] = signal_creator.get()
+
         shift_list(delay_buffer)
-        delay_buffer[0] = time_vector[1][0]
-        
+        delay_buffer[0] = signal[0]
+
         # update adaptive filter
-        b,e,y = ad_filter.update(x=delay_buffer[-1], d=time_vector[1][0])
+        b,e,y = ad_filter.update(x=delay_buffer[-1], d=signal[0])
         shift_list(predicted_values)
         predicted_values[0] = y
         shift_list(prediction_error)
         prediction_error[0] = 20*np.log10(abs(e))
         # print("b: {},\ne: {}\n--------".format(b,e))
-        l1.set_ydata(time_vector[1])
+        l1.set_ydata(signal)
         l2.set_ydata(predicted_values)
         l3.set_xdata(time[delay_samples-1:delay_samples-1+ad_filter.N])
         l3.set_ydata(ad_filter.x)
         ax[0].set_ylim(min(predicted_values),max(predicted_values))
 
         l4.set_ydata(prediction_error)
-        ax[1].set_ylim(min(prediction_error),max(prediction_error))
-        
+        try:
+            ax[1].set_ylim(min(prediction_error),max(prediction_error))
+        except:
+            pass
+
         l5.set_ydata(b)
         ax[2].set_ylim(min(b),max(b))
         plt.pause(0.01)
-        sleep(1/Fs)            
+        sleep(1/Fs)
 
 if __name__ == '__main__':
     main()
