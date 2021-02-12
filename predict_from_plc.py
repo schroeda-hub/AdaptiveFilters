@@ -15,7 +15,7 @@ class signal_creator_obj(object):
     def __init__(self, Fs:float):
         self.sample_number = -1
         self.Fs = Fs
-        self.f = 0.1 # Hz
+        self.f = 5 # Hz
         self.noise_enable = True
 
     def _noise(self):
@@ -28,7 +28,7 @@ class signal_creator_obj(object):
         return np.sin(self.sample_number/self.Fs * 2 * np.pi * self.f) + self._noise()
 
 def main():
-    Fs = 10 # Hz
+    Fs = 20 # Hz
     buffer_size = 1024
     time_duration = buffer_size * 1/Fs
 
@@ -53,23 +53,25 @@ def main():
         plc.close()
 
 
-    delay_samples = 10
+    delay_samples = 15
     delay_buffer = np.ones(delay_samples) * signal[0]
-    ad_filter = fir_adaptive_rls(20) # RLS
+    ad_filter = fir_adaptive_rls(20, p=0.6) # RLS
     # ad_filter = fir_adaptive_lms(20) # LMS
     predicted_values = np.zeros(buffer_size) + signal
     prediction_error = np.zeros(buffer_size)
-    fig,ax = plt.subplots(3)
+    error = np.zeros(buffer_size)
+    fig,ax = plt.subplots(4)
     l1, l2, l3 = ax[0].plot(
         time,
         signal,
-        '--' ,
+        "-",
         time,
         predicted_values,
+        "-",
         time[delay_samples:delay_samples+ad_filter.N],
         ad_filter.x)
     ax[0].set_xlim(0,time_duration)
-    ax[0].legend((l1, l2, l3),('signal', 'predicted signal', 'training_data'))
+    ax[0].legend((l1, l2, l3),('signal', 'predicted signal', 'training_data', 'error'))
     ax[0].set_xlabel('time')
     ax[0].set_ylabel('')
     ax[0].axis('tight')
@@ -78,9 +80,14 @@ def main():
     ax[1].set_xlabel('time')
     ax[1].set_ylabel('prediction error [dB]')
     ax[1].axis('tight')
-    l5, = ax[2].plot(ad_filter.b)
-    ax[2].set_xlabel('Filter value')
+    l5, = ax[2].plot(time, error)
+    ax[2].set_xlim(0,time_duration)
+    ax[2].set_xlabel('time')
+    ax[2].set_ylabel('error')
     ax[2].axis('tight')
+    l6, = ax[3].plot(ad_filter.b)
+    ax[3].set_xlabel('Filter value')
+    ax[3].axis('tight')
     plt.pause(0.01)
     plt.tight_layout()
 
@@ -90,7 +97,7 @@ def main():
         signal *= 0
         delay_buffer *= 0
         predicted_values *= 0
-        for i in range(delay_samples):
+        for i in range(int(delay_samples*0.1)):
             shift_list(signal)
             signal[0] = signal_creator.get()
         pass
@@ -114,12 +121,13 @@ def main():
         b,e,y = ad_filter.update(x=delay_buffer[-1], d=signal[0])
         shift_list(predicted_values)
         predicted_values[0] = y
+        shift_list(error)
+        error[0] = e
         shift_list(prediction_error)
         prediction_error[0] = 20*np.log10(abs(e))
         # print("b: {},\ne: {}\n--------".format(b,e))
         l1.set_ydata(signal)
         l2.set_ydata(predicted_values)
-        l3.set_xdata(time[delay_samples-1:delay_samples-1+ad_filter.N])
         l3.set_ydata(ad_filter.x)
         ax[0].set_ylim(min(predicted_values),max(predicted_values))
 
@@ -129,8 +137,11 @@ def main():
         except:
             pass
 
-        l5.set_ydata(b)
-        ax[2].set_ylim(min(b),max(b))
+        l5.set_ydata(error)
+        ax[2].set_ylim(min(error),max(error))
+
+        l6.set_ydata(b)
+        ax[3].set_ylim(min(b),max(b))
         plt.pause(0.01)
         sleep(1/Fs)
 
