@@ -1,4 +1,3 @@
-import pyads
 import numpy as np
 import matplotlib.pyplot as plt
 from time import sleep
@@ -42,6 +41,7 @@ def main():
     signal = np.ones(buffer_size)
 
     if ads_enable:
+        import pyads
         remote_ip = '192.168.20.157'
         remote_ads = '192.168.30.202.1.1'
         plc = pyads.Connection(remote_ads, pyads.PORT_TC3PLC1, remote_ip)
