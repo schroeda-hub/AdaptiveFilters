@@ -118,9 +118,9 @@ class fir_adaptive_rls(object):
         try:
             numerator = self.R_inv @ self.x
             denominator = (self.p + self.x.T @ (self.R_inv @ self.x))
-            if denominator >= 1e307:
-                print(self.b)
-                return
+            if denominator >= 1e307 and False:
+                print(self.b+"\n")
+                return self.b, self.e, self.y
             assert denominator != 0
             self.z = numerator/denominator
             pass
